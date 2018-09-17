@@ -1,0 +1,192 @@
+type
+  TRSItemFinder_Image = type TMufasaBitmap;
+
+// Loads image from file, adding the item border if needed.
+// Make sure item has a 1 px padding from the edge
+procedure TRSItemFinder_Image.Load(FilePath: String);
+
+  function GetItemEdge(TPA: TPointArray): TPointArray;
+  var
+    Matrix: T2DBoolArray;
+    Area: TBox;
+    i, X, Y, W, H: Int32;
+  begin
+    Area := TPA.Bounds();
+
+    SetLength(Matrix, Area.Height, Area.Width);
+    for i := 0 to High(TPA) do
+      Matrix[TPA[i].Y - Area.Y1][TPA[i].X - Area.X1] := True;
+
+    W := High(Matrix[0]);
+    H := High(Matrix);
+
+    for i := 0 to High(TPA) do
+    begin
+      X := TPA[i].X - Area.X1;
+      Y := TPA[i].Y - Area.Y1;
+
+      if (X = 0) or (Y = 0) or (X = W) or (Y = H) then
+        Continue;
+      if Matrix[Y, X - 1] and Matrix[Y, X + 1] and Matrix[Y - 1, X] and Matrix[Y + 1, X] then
+        Continue;
+
+      Result := Result + TPA[i];
+    end;
+  end;
+
+var
+  TPA: TPointArray;
+begin
+  Self.Init(Client.GetMBitmaps());
+  Self.LoadFromFile(FilePath);
+  Self.ReplaceColor($FFFFFF, 0);
+
+  if not Self.FindColors(TPA, $10000) and Self.FindColors(TPA, 0) then
+    DrawTPA(GetItemEdge(TPA), $10000);
+end;
+
+// Aligns the images. `Self` must be the inventory image and `Other` size must be greater or equal than `Self`
+// Clears the background of `Self` too.
+procedure TRSItemFinder_Image.Align(Other: TRSItemFinder_Image);
+var
+  TPA, TPA1, TPA2: TPointArray;
+  Replacement: TMufasaBitmap;
+  X, Y: Int32;
+begin
+  if not Self.FindColors(TPA1, $10000) then
+    raise 'No border on `self` - cannot align';
+  if not Other.FindColors(TPA2, $10000) then
+    raise 'No border on `other` - cannot align';
+
+  Replacement.Init(Client.GetMBitmaps());
+  Replacement.SetSize(Other.GetWidth(), Other.GetHeight());
+
+  TPA1.SortByRow(True);
+  TPA2.SortByRow(True);
+
+  X := Max(0, TPA2[0].X - TPA1[0].X);
+  Y := Max(0, TPA2[0].Y - TPA1[0].Y);
+
+  Self.DrawTransparent(X, Y, Replacement);
+
+  if Other.FindColors(TPA, 0) then
+    Replacement.DrawTPA(TPA, 0);
+
+  Self.Free();
+  Self := Replacement;
+end;
+
+// Removes the stack number from both images. `Self` must be the inventory image.
+procedure TRSItemFinder_Image.RemoveStack(Other: TRSItemFinder_Image);
+var
+  Color: Int32;
+  TPA: TPointArray;
+  B: TBox;
+begin
+  for Color in [$FFFFFF, $00FFFF, $80FF00] do
+    if Self.FindColors(TPA, Color) then
+    begin
+      B := TPA.Bounds();
+      b.Expand(1);
+
+      Self.Rectangle(B, 0);
+      Other.Rectangle(B, 0);
+    end;
+end;
+
+type
+  TRSItemFinder = record
+    ImagePath: String;
+    Images: array of TRSItemFinder_Image;
+    Similarity: Double;
+  end;
+
+function TRSItemFinder.Find(ID: String; Boxes: TBoxArray): TIntegerArray;
+
+  function GetItemID(Identifer: String): String;
+  var
+    List: TStringList;
+  begin
+    List.Init();
+    List.LoadFromFile(ImagePath + 'items.txt');
+    if List.IndexOfName(Identifer) >= 0 then
+      Result := List.getValues(Identifer);
+    List.Free();
+  end;
+
+  function GetImage(Identifer: String): TRSItemFinder_Image;
+  var
+    i: Int32;
+    Image: TRSItemFinder_Image;
+  begin
+    for i := 0 to High(Images) do
+      if (Images[i].GetName() = Identifer) then
+        Exit(Images[i].Copy());
+
+    try
+      StrToInt(Identifer);
+    except
+      ID := GetItemID(Identifer);
+      if ID = '' then
+        raise 'Unknown item ID for: ' + Identifer;
+
+      Image.Load(ImagePath + ID + '.png');
+      Image.SetName(Identifer);
+    end;
+
+    if (Image = nil) then
+    begin
+      Image.Load(ImagePath + Identifer + '.png');
+      Image.SetName(Identifer);
+    end;
+
+    Images += Image;
+
+    Exit(Image.Copy());
+  end;
+
+var
+  Image, Templ: TRSItemFinder_Image;
+  TPA: TPointArray;
+  Index: Int32;
+begin
+  for Index := 0 to High(Boxes) do
+  begin
+    Image := GetImage(ID);
+
+    Templ.FromClient(Boxes[Index]);
+
+    if Templ.FindColors(TPA, $10000) then
+    begin
+      Templ.Align(Image);
+      Templ.RemoveStack(Image);
+
+      // overkill but returns a steady match with a good distinction between similar items.
+      // both images are same size, so only one loopover.
+      if Image.MatchTemplate(Templ, TM_CCOEFF_NORMED)[0][0] >= Self.Similarity then
+        Result += Index;
+    end;
+
+    Image.Free();
+  end;
+end;
+
+procedure TRSItemFinder.Free;
+var
+  i: Int32;
+begin
+  for i := 0 to High(Images) do
+    Images[i].Free();
+end;
+
+var
+  ItemFinder: TRSItemFinder;
+
+begin
+  ItemFinder.Similarity := 0.995;
+  ItemFinder.ImagePath := IncludePath + 'RSItemFinder/item-images/';
+
+  AddOnTerminate(@ItemFinder.Free);
+end;
+
+{$i itemfinder_finders.simba}

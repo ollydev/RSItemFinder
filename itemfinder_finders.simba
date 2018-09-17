@@ -1,0 +1,127 @@
+function TRSInventory.FindAll(Identifers: TStringArray): TIntegerArray; overload;
+var
+  Identifer: String;
+begin
+  if Self.Open() then
+    for Identifer in Identifers do
+      Result += ItemFinder.Find(Identifer, Self.FSlots);
+end;
+
+function TRSInventory.FindAll(Identifer: String): TIntegerArray; overload;
+begin
+  Result := Self.FindAll([Identifer]);
+end;
+
+function TRSInventory.Find(Identifers: TStringArray): Int32; overload;
+var
+  Identifer: String;
+  Matches: TIntegerArray;
+begin
+  for Identifer in Identifers do
+  begin
+    Matches := Self.FindAll(Identifer);
+    if Length(Matches) > 0 then
+      Exit(Matches[0]);
+  end;
+
+  Exit(-1);
+end;
+
+function TRSInventory.Find(Identifer: String): Int32; overload;
+begin
+  Result := Self.Find([Identifer]);
+end;
+
+function TRSInventory.Count(Identifers: TStringArray): Int32; overload;
+var
+  Identifer: String;
+begin
+  for Identifer in Identifers do
+    Result += Length(Self.FindAll(Identifer));
+end;
+
+function TRSInventory.Count(Identifer: String): Int32; overload;
+begin
+  Result := Self.Count([Identifer]);
+end;
+
+function TRSInventory.CountStack(Identifer: String): Int32;
+var
+  Slot: Int32;
+begin
+  Slot := Self.Find(Identifer);
+  if (Slot > -1) then
+    Result := srl.GetItemAmount(Self.GetSlotBox(Slot));
+end;
+
+function TRSInventory.Click(Identifers: TStringArray; Option: String = ''): Boolean; overload;
+var
+  Slot: Int32;
+begin
+  Slot := Self.Find(Identifers);
+
+  if (Slot > -1) then
+  begin
+    Self.MouseSlot(Slot, mouse_Move);
+
+    if (Option = '') then
+      Mouse.Click(mouse_Left)
+    else
+    if (not ChooseOption.Open()) or (not ChooseOption.Select(Option)) then
+      Exit(False);
+
+    Exit(True);
+  end;
+end;
+
+function TRSInventory.Click(Identifer: String; Option: String = ''): Boolean; overload;
+begin
+  Result := Self.Click([Identifer], Option);
+end;
+
+function TRSBankScreen.Find(Identifers: TStringArray): Int32; overload;
+var
+  Identifer: String;
+  Matches: TIntegerArray;
+begin
+  Self.FixSlots();
+
+  for Identifer in Identifers do
+  begin
+    Matches := ItemFinder.Find(Identifer, Self.FSlots);
+    if Length(Matches) > 0 then
+      Exit(Matches[0]);
+  end;
+
+  Exit(-1);
+end;
+
+function TRSBankScreen.Find(Identifer: String): Int32; overload;
+begin
+  Result := Self.Find([Identifer]);
+end;
+
+function TRSBankScreen.Withdraw(Identifier: String; Amount: Int32; UpText:TStringArray=[]; Mode: EBankButton = bbItem): Boolean; overload;
+var
+  Slot: Int32;
+begin
+  Slot := Self.Find(Identifier);
+  if (Slot > -1) then
+    Result := Self.Withdraw(Slot, Amount, UpText, Mode);
+end;
+
+function TRSBankScreen.Count(Identifer: String): Int32;
+begin
+  Self.FixSlots();
+
+  Result := Length(ItemFinder.Find(Identifer, Self.FSlots));
+end;
+
+function TRSBankScreen.CountStack(Identifer: String): Int32;
+var
+  Slot: Int32;
+begin
+  Slot := Self.Find(Identifer);
+  if (Slot > -1) then
+    Result := srl.GetItemAmount(Self.GetSlotBox(Slot));
+end;
