@@ -152,8 +152,7 @@ begin
   for Index := 0 to High(Boxes) do
   begin
     Image := GetImage(ID);
-
-    Templ.FromClient(Boxes[Index]);
+    Templ := GetMufasaBitmap(BitmapFromClient(Boxes[Index]));
 
     if Templ.FindColors(TPA, $10000) then
     begin
@@ -167,6 +166,7 @@ begin
     end;
 
     Image.Free();
+    Templ.Free();
   end;
 end;
 
