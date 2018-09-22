@@ -86,8 +86,7 @@ begin
   for Color in [$FFFFFF, $00FFFF, $80FF00] do
     if Self.FindColors(TPA, Color) then
     begin
-      B := TPA.Bounds();
-      b.Expand(1);
+      B := TPA.Bounds().Expand(1);
 
       Self.Rectangle(B, 0);
       Other.Rectangle(B, 0);
