@@ -161,7 +161,8 @@ begin
 
       // overkill but returns a steady match with a good distinction between similar items.
       // both images are same size, so only one loopover.
-      if Image.MatchTemplate(Templ, TM_CCOEFF_NORMED)[0][0] >= Self.Similarity then
+      // WriteLn Image.MatchTemplate(Templ, TM_CCORR_NORMED)[0][0];
+      if Image.MatchTemplate(Templ, TM_CCORR_NORMED)[0][0] >= Self.Similarity then
         Result += Index;
     end;
 
@@ -182,7 +183,7 @@ var
   ItemFinder: TRSItemFinder;
 
 begin
-  ItemFinder.Similarity := 0.995;
+  ItemFinder.Similarity := 0.9965;
   ItemFinder.ImagePath := IncludePath + 'RSItemFinder/item-images/';
 
   AddOnTerminate(@ItemFinder.Free);
