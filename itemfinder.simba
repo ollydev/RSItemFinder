@@ -51,7 +51,8 @@ procedure TRSItemFinder_Image.Align(Other: TRSItemFinder_Image);
 var
   TPA, TPA1, TPA2: TPointArray;
   Replacement: TMufasaBitmap;
-  X, Y: Int32;
+  X, Y, Color: Int32;
+  B: TBox;
 begin
   if not Self.FindColors(TPA1, $10000) then
     raise 'No border on `self` - cannot align';
@@ -69,28 +70,24 @@ begin
 
   Self.DrawTransparent(X, Y, Replacement);
 
+  for Color in [$FFFFFF, $00FFFF, $80FF00] do
+    if Replacement.FindColors(TPA, Color) then
+    begin
+      B := TPA.Bounds().Expand(1);
+      if (B.X1 < 0) then
+        B.X1 := 0;
+      if (B.Y1 < 0) then
+        B.Y1 := 0;
+
+      Replacement.Rectangle(B, 0);
+      Other.Rectangle(B, 0);
+    end;
+
   if Other.FindColors(TPA, 0) then
     Replacement.DrawTPA(TPA, 0);
 
   Self.Free();
   Self := Replacement;
-end;
-
-// Removes the stack number from both images. `Self` must be the inventory image.
-procedure TRSItemFinder_Image.RemoveStack(Other: TRSItemFinder_Image);
-var
-  Color: Int32;
-  TPA: TPointArray;
-  B: TBox;
-begin
-  for Color in [$FFFFFF, $00FFFF, $80FF00] do
-    if Self.FindColors(TPA, Color) then
-    begin
-      B := TPA.Bounds().Expand(1);
-
-      Self.Rectangle(B, 0);
-      Other.Rectangle(B, 0);
-    end;
 end;
 
 type
@@ -157,7 +154,6 @@ begin
     if Templ.FindColors(TPA, $10000) then
     begin
       Templ.Align(Image);
-      Templ.RemoveStack(Image);
 
       // overkill but returns a steady match with a good distinction between similar items.
       // both images are same size, so only one loopover.
@@ -169,6 +165,8 @@ begin
     Image.Free();
     Templ.Free();
   end;
+
+  //TerminateScript();
 end;
 
 procedure TRSItemFinder.Free;
@@ -183,7 +181,7 @@ var
   ItemFinder: TRSItemFinder;
 
 begin
-  ItemFinder.Similarity := 0.9965;
+  ItemFinder.Similarity := 0.99993; // 0.9965;
   ItemFinder.ImagePath := IncludePath + 'RSItemFinder/item-images/';
 
   AddOnTerminate(@ItemFinder.Free);
