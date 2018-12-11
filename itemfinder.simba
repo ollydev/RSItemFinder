@@ -1,8 +1,8 @@
 type
   TRSItemFinder_Image = type TMufasaBitmap;
 
-// Loads image from file, adding the item border if needed.
-// Make sure item has a 1 px padding from the edge
+// Loads item image adding the item border if needed.
+// Make sure item has a 1 px padding from the edge.
 procedure TRSItemFinder_Image.Load(FilePath: String);
 
   function GetItemEdge(TPA: TPointArray): TPointArray;
@@ -45,51 +45,6 @@ begin
     DrawTPA(GetItemEdge(TPA), $10000);
 end;
 
-// Aligns the images. `Self` must be the inventory image and `Other` size must be greater or equal than `Self`
-// Clears the background of `Self` too.
-procedure TRSItemFinder_Image.Align(Other: TRSItemFinder_Image);
-var
-  TPA, TPA1, TPA2: TPointArray;
-  Replacement: TMufasaBitmap;
-  X, Y, Color: Int32;
-  B: TBox;
-begin
-  if not Self.FindColors(TPA1, $10000) then
-    raise 'No border on `self` - cannot align';
-  if not Other.FindColors(TPA2, $10000) then
-    raise 'No border on `other` - cannot align';
-
-  Replacement.Init(Client.GetMBitmaps());
-  Replacement.SetSize(Other.GetWidth(), Other.GetHeight());
-
-  TPA1.SortByRow(True);
-  TPA2.SortByRow(True);
-
-  X := Max(0, TPA2[0].X - TPA1[0].X);
-  Y := Max(0, TPA2[0].Y - TPA1[0].Y);
-
-  Self.DrawTransparent(X, Y, Replacement);
-
-  for Color in [$FFFFFF, $00FFFF, $80FF00] do
-    if Replacement.FindColors(TPA, Color) then
-    begin
-      B := TPA.Bounds().Expand(1);
-      if (B.X1 < 0) then
-        B.X1 := 0;
-      if (B.Y1 < 0) then
-        B.Y1 := 0;
-
-      Replacement.Rectangle(B, 0);
-      Other.Rectangle(B, 0);
-    end;
-
-  if Other.FindColors(TPA, 0) then
-    Replacement.DrawTPA(TPA, 0);
-
-  Self.Free();
-  Self := Replacement;
-end;
-
 type
   TRSItemFinder = record
     ImagePath: String;
@@ -106,14 +61,15 @@ function TRSItemFinder.Find(ID: String; Boxes: TBoxArray): TIntegerArray;
     List.Init();
     List.LoadFromFile(ImagePath + 'items.txt');
     if List.IndexOfName(Identifer) >= 0 then
-      Result := List.getValues(Identifer);
+      Result := List.GetValues(Identifer);
     List.Free();
   end;
 
-  function GetImage(Identifer: String): TRSItemFinder_Image;
+  function GetItemImage(Identifer: String): TRSItemFinder_Image;
   var
     i: Int32;
     Image: TRSItemFinder_Image;
+    TPA: TPointArray;
   begin
     for i := 0 to High(Images) do
       if (Images[i].GetName() = Identifer) then
@@ -136,37 +92,103 @@ function TRSItemFinder.Find(ID: String; Boxes: TBoxArray): TIntegerArray;
       Image.SetName(Identifer);
     end;
 
+    Image.FindColors(TPA, $10000);
+    with TPA.Bounds() do
+      Image.Crop(X1, Y1, X2, Y2);
+
     Images += Image;
 
     Exit(Image.Copy());
   end;
 
+  function GetItemStack(Image: TRSItemFinder_Image): TPointArray;
+  var
+    Color: Int32;
+    TPA: TPointArray;
+  begin
+    for Color in [$FFFFFF, $00FFFF, $80FF00] do
+      if Image.FindColors(TPA, Color) then
+        Result := Result + TPA;
+
+    TPA := Copy(Result);
+    TPA.Offset(Point(1, 1));
+
+    Result := Result + TPA;
+  end;
+
+  function GetItemEdge(Image: TRSItemFinder_Image): TPointArray;
+  begin
+    if Image.FindColors(Result, $10000) then
+      Result := ClearTPAFromTPA(Result, GetItemStack(Image));
+  end;
+
+  procedure AlignTemplateToImage(Image: TRSItemFinder_Image; var Templ: TRSItemFinder_Image);
+  var
+    TPA: TPointArray;
+    Replacement: TRSItemFinder_Image;
+  begin
+    Replacement.Init();
+    Replacement.SetSize(Image.GetWidth(), Image.GetHeight());
+
+    with GetItemEdge(Image).Bounds() do
+      Templ.DrawTransparent(
+        Max(0, X2 - Templ.GetWidth() + 1),
+        Max(0, Y2 - Templ.GetHeight() + 1), Replacement
+      );
+
+    Templ.Free();
+    Templ := Replacement;
+  end;
+
+  procedure ClearBackground(Template, Image: TRSItemFinder_Image);
+  var
+    TPA: TPointArray;
+  begin
+    if Image.FindColors(TPA, 0) then
+      Template.DrawTPA(TPA, 0);
+  end;
+
+  procedure ClearStack(Image, Template: TRSItemFinder_Image);
+  var
+    P: TPoint;
+  begin
+    for P in GetItemStack(Template) do
+    begin
+      if Template.PointInBitmap(P.X, P.Y) then
+        Template.SetPixel(P.X, P.Y, 0);
+      if Image.PointInBitmap(P.X, P.Y) then
+        Image.SetPixel(P.X, P.Y, 0);
+    end;
+  end;
+
 var
   Image, Templ: TRSItemFinder_Image;
-  TPA: TPointArray;
   Index: Int32;
 begin
   for Index := 0 to High(Boxes) do
   begin
-    Image := GetImage(ID);
-    Templ := GetMufasaBitmap(BitmapFromClient(Boxes[Index]));
+    Image := GetMufasaBitmap(BitmapFromClient(Boxes[Index]));
+    Templ := GetItemImage(ID);
 
-    if Templ.FindColors(TPA, $10000) then
-    begin
-      Templ.Align(Image);
+    AlignTemplateToImage(Image, Templ);
+    ClearStack(Templ, Image);
+    ClearBackground(Image, Templ);
 
-      // overkill but returns a steady match with a good distinction between similar items.
-      // both images are same size, so only one loopover.
-      // WriteLn Image.MatchTemplate(Templ, TM_CCORR_NORMED)[0][0];
-      if Image.MatchTemplate(Templ, TM_CCORR_NORMED)[0][0] >= Self.Similarity then
-        Result += Index;
-    end;
+    {$IFDEF ITEMFINDER_DEBUG}
+    Image.SaveToFile('image.png');
+    Templ.SaveToFile('templ.png');
+
+    WriteLn Image.MatchTemplate(Templ, TM_CCORR_NORMED)[0][0];
+
+    TerminateScript();
+    {$ENDIF}
+
+    if Image.MatchTemplate(Templ, TM_CCORR_NORMED)[0][0] >= Self.Similarity then
+      Result := Result + Index;
 
     Image.Free();
     Templ.Free();
   end;
-
-  //TerminateScript();
 end;
 
 procedure TRSItemFinder.Free;
@@ -181,7 +203,7 @@ var
   ItemFinder: TRSItemFinder;
 
 begin
-  ItemFinder.Similarity := 0.99993; // 0.9965;
+  ItemFinder.Similarity := 0.99997;
   ItemFinder.ImagePath := IncludePath + 'RSItemFinder/item-images/';
 
   AddOnTerminate(@ItemFinder.Free);
