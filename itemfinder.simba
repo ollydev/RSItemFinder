@@ -146,6 +146,12 @@ function TRSItemFinder.Find(ID: String; Boxes: TBoxArray): TIntegerArray;
   begin
     if Image.FindColors(TPA, 0) then
       Template.DrawTPA(TPA, 0);
+
+    if Image.FindColors(TPA, $202030) then // Noted item border
+    begin
+      Image.DrawTPA(TPA, 0);
+      Template.DrawTPA(TPA, 0);
+    end;
   end;
 
   procedure ClearStack(Image, Template: TRSItemFinder_Image);
