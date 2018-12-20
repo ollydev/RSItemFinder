@@ -1,3 +1,7 @@
+const
+  ITEM_FINDER_IMAGE_PATH = {$macro CURRENT_DIRECTORY} + '/images/';
+  ITEM_FINDER_ID_FILE = {$macro CURRENT_DIRECTORY} + '/itemid.txt';
+
 type
   TRSItemFinder_Image = type TMufasaBitmap;
 
@@ -47,27 +51,45 @@ end;
 
 type
   TRSItemFinder = record
-    ImagePath: String;
-    Images: array of TRSItemFinder_Image;
     Similarity: Double;
+    Images: array of TRSItemFinder_Image;
   end;
 
-function TRSItemFinder.Find(ID: String; Boxes: TBoxArray): TIntegerArray;
+function TRSItemFinder.GetItemID(Identifer: String): Int32;
+var
+  Noted: Boolean;
+  List: TStringList;
+begin
+  Identifer := StringReplace(Identifer, ' ', '_', [rfReplaceAll]).Lower();
+  Noted := 'noted_' in Identifer
+  if Noted then
+    Identifer := StringReplace(Identifer, 'noted_', '', [rfIgnoreCase]);
 
-  function GetItemID(Identifer: String): String;
-  var
-    List: TStringList;
-  begin
+  try
+    Result := StrToInt(Identifer);
+  except
     List.Init();
-    List.LoadFromFile(ImagePath + 'items.txt');
-    if List.IndexOfName(Identifer) >= 0 then
-      Result := List.GetValues(Identifer);
-    List.Free();
+
+    try
+      List.LoadFromFile(ITEM_FINDER_ID_FILE);
+      if List.IndexOfName(Identifer) = -1 then
+        raise 'Unknown item ID for: ' + Identifer;
+
+      Result := StrToIntDef(List.GetValues(Identifer), -1);
+    finally
+      List.Free();
+    end;
+
+    if Noted then
+      Result := Result + 1;
   end;
+end;
+
+function TRSItemFinder.Find(Identifer: String; Boxes: TBoxArray): TIntegerArray;
 
   function GetItemImage(Identifer: String): TRSItemFinder_Image;
   var
-    i: Int32;
+    i, ID: Int32;
     Image: TRSItemFinder_Image;
     TPA: TPointArray;
   begin
@@ -75,28 +97,14 @@ function TRSItemFinder.Find(ID: String; Boxes: TBoxArray): TIntegerArray;
       if (Images[i].GetName() = Identifer) then
         Exit(Images[i].Copy());
 
-    try
-      StrToInt(Identifer);
-    except
-      ID := GetItemID(Identifer);
-      if ID = '' then
-        raise 'Unknown item ID for: ' + Identifer;
-
-      Image.Load(ImagePath + ID + '.png');
-      Image.SetName(Identifer);
-    end;
-
-    if (Image = nil) then
-    begin
-      Image.Load(ImagePath + Identifer + '.png');
-      Image.SetName(Identifer);
-    end;
+    Image.Load(Format('%s%d.png', [ITEM_FINDER_IMAGE_PATH, Self.GetItemID(Identifer)]));
+    Image.SetName(Identifer);
 
     Image.FindColors(TPA, $10000);
     with TPA.Bounds() do
       Image.Crop(X1, Y1, X2, Y2);
 
-    Images += Image;
+    Self.Images := Self.Images + Image;
 
     Exit(Image.Copy());
   end;
@@ -174,7 +182,7 @@ begin
   for Index := 0 to High(Boxes) do
   begin
     Image := GetMufasaBitmap(BitmapFromClient(Boxes[Index]));
-    Templ := GetItemImage(ID);
+    Templ := GetItemImage(Identifer);
 
     AlignTemplateToImage(Image, Templ);
     ClearStack(Templ, Image);
@@ -206,12 +214,9 @@ begin
 end;
 
 var
-  ItemFinder: TRSItemFinder;
+  ItemFinder: TRSItemFinder = [0.99997];
 
 begin
-  ItemFinder.Similarity := 0.99997;
-  ItemFinder.ImagePath := IncludePath + 'RSItemFinder/item-images/';
-
   AddOnTerminate(@ItemFinder.Free);
 end;
 

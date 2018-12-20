@@ -101,13 +101,47 @@ begin
   Result := Self.Find([Identifer]);
 end;
 
-function TRSBankScreen.Withdraw(Identifier: String; Amount: Int32; UpText:TStringArray=[]; Mode: EBankButton = bbItem): Boolean; overload;
+function TRSBankScreen.Withdraw(Identifier: String; Amount: Int32; UpText: TStringArray = []; WithdrawMode: EBankButton = BANK_BUTTON_WITHDRAW_ITEM; Quantity: EBankButton = BANK_BUTTON_QUANTITY_ONE): Boolean; overload;
 var
   Slot: Int32;
 begin
   Slot := Self.Find(Identifier);
   if (Slot > -1) then
-    Result := Self.Withdraw(Slot, Amount, UpText, Mode);
+    Result := Self.Withdraw(Slot, Amount, UpText, WithdrawMode, Quantity);
+end;
+
+function TRSBankScreen.WithdrawEx(Identifer: String; Amount: Int32; WithdrawMode: EBankButton = BANK_BUTTON_WITHDRAW_ITEM; Quantity: EBankButton = BANK_BUTTON_QUANTITY_ONE): Boolean;
+var
+  B: TBox;
+  TPA: TPointArray;
+  T: UInt64;
+begin
+  if Self.Withdraw(Identifer, Amount, TStringArray([]), WithdrawMode, Quantity) then
+    Exit(True);
+
+  if Self.Search(Identifer) then
+  begin
+    B := Self.GetBounds();
+    B.Y1 += 75;
+    B.X1 += 10;
+    B.X2 -= 22;
+    B.Y2 -= 42;
+
+    T := GetTickCount() + Random(2500, 3000);
+    while (T > GetTickCount()) do
+    begin
+      if SRL.FindColors(TPA, CTS2(3358280, 1, 0.80, 0.41), B) > 0 then
+        for TPA in TPA.Invert().Cluster(3) do
+        begin
+          B := TPA.Bounds();
+
+          if ItemFinder.Find(Identifer, [B]) <> [] then
+            Exit(Self.Withdraw(B, Amount, TStringArray([]), WithdrawMode, Quantity));
+        end;
+
+      Wait(0, 500, wdLeft);
+    end;
+  end;
 end;
 
 function TRSBankScreen.Count(Identifer: String): Int32;
