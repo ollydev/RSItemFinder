@@ -85,7 +85,7 @@ begin
   end;
 end;
 
-function TRSItemFinder.Find(Identifer: String; Boxes: TBoxArray): TIntegerArray;
+function TRSItemFinder.Find(Identifer: String; Slots: TBoxArray): TIntegerArray;
 
   function GetItemImage(Identifer: String): TRSItemFinder_Image;
   var
@@ -124,24 +124,33 @@ function TRSItemFinder.Find(Identifer: String; Boxes: TBoxArray): TIntegerArray;
     Result := Result + TPA;
   end;
 
-  function GetItemEdge(Image: TRSItemFinder_Image): TPointArray;
+  function GetItemCorner(Image: TRSItemFinder_Image): TPoint;
+  var
+    TPA: TPointArray;
+    ATPA: T2DPointArray;
   begin
-    if Image.FindColors(Result, $10000) then
-      Result := ClearTPAFromTPA(Result, GetItemStack(Image));
+    Image.FindColors(TPA, $10000);
+
+    // a bottom point isn't obstructed by any noise
+    SortTPAByY(TPA, True);
+    Result := TPA[High(TPA)];
   end;
 
   procedure AlignTemplateToImage(Image: TRSItemFinder_Image; var Templ: TRSItemFinder_Image);
   var
     TPA: TPointArray;
     Replacement: TRSItemFinder_Image;
+    ImageCorner, TemplateCorner: TPoint;
   begin
     Replacement.Init();
     Replacement.SetSize(Image.GetWidth(), Image.GetHeight());
 
-    with GetItemEdge(Image).Bounds() do
-      Templ.DrawTransparent(
-        Max(0, X2 - Templ.GetWidth() + 1),
-        Max(0, Y2 - Templ.GetHeight() + 1), Replacement
+    ImageCorner := GetItemCorner(Image);
+    TemplateCorner := GetItemCorner(Templ);
+
+    Templ.DrawTransparent(
+        Max(0, ImageCorner.X - TemplateCorner.X),
+        Max(0, ImageCorner.Y - TemplateCorner.Y), Replacement
       );
 
     Templ.Free();
@@ -179,9 +188,12 @@ var
   Image, Templ: TRSItemFinder_Image;
   Index: Int32;
 begin
-  for Index := 0 to High(Boxes) do
+  for Index := 0 to High(Slots) do
   begin
-    Image := GetMufasaBitmap(BitmapFromClient(Boxes[Index]));
+    if CountColor($10000, Slots[Index]) = 0 then // Check for item
+      Continue;
+
+    Image := GetMufasaBitmap(BitmapFromClient(Slots[Index]));
     Templ := GetItemImage(Identifer);
 
     AlignTemplateToImage(Image, Templ);

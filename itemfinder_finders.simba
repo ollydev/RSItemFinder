@@ -110,10 +110,35 @@ begin
     Result := Self.Withdraw(Slot, Amount, UpText, WithdrawMode, Quantity);
 end;
 
-function TRSBankScreen.WithdrawEx(Identifer: String; Amount: Int32; WithdrawMode: EBankButton = BANK_BUTTON_WITHDRAW_ITEM; Quantity: EBankButton = BANK_BUTTON_QUANTITY_ONE): Boolean;
+function TRSBankScreen.SearchWithdraw(Identifer: String; Amount: Int32; WithdrawMode: EBankButton = BANK_BUTTON_WITHDRAW_ITEM; Quantity: EBankButton = BANK_BUTTON_QUANTITY_ONE): Boolean;
+
+  function GetItems: TBoxArray;
+  const
+    COLOR_BANK_BACKGROUND: TCTS2Color = [3358280, 1, 0.80, 0.41];
+  var
+    TPA: TPointArray;
+    ATPA: T2DPointArray;
+    Area: TBox;
+  begin
+    Area := Self.GetBounds(); // Item area
+    Area.Y1 += 75;
+    Area.X1 += 10;
+    Area.X2 -= 22;
+    Area.Y2 -= 42;
+
+    if SRL.FindColors(TPA, COLOR_BANK_BACKGROUND, Area) > 0 then
+    begin
+      TPA := TPA.Invert();
+      ATPA := TPA.Cluster(3);
+      SortATPAFromFirstPointX(ATPA, []);
+      for TPA in ATPA do
+        Result := Result + TPA.Bounds();
+    end;
+  end;
+
 var
-  B: TBox;
-  TPA: TPointArray;
+  Items: TBoxArray;
+  Slots: TIntegerArray;
   T: UInt64;
 begin
   if Self.Withdraw(Identifer, Amount, TStringArray([]), WithdrawMode, Quantity) then
@@ -121,25 +146,13 @@ begin
 
   if Self.Search(Identifer) then
   begin
-    B := Self.GetBounds();
-    B.Y1 += 75;
-    B.X1 += 10;
-    B.X2 -= 22;
-    B.Y2 -= 42;
+    Items := GetItems();
+    Slots := ItemFinder.Find(Identifer, Items);
 
-    T := GetTickCount() + Random(2500, 3000);
-    while (T > GetTickCount()) do
+    if Length(Slots) > 0 then
     begin
-      if SRL.FindColors(TPA, CTS2(3358280, 1, 0.80, 0.41), B) > 0 then
-        for TPA in TPA.Invert().Cluster(3) do
-        begin
-          B := TPA.Bounds();
-
-          if ItemFinder.Find(Identifer, [B]) <> [] then
-            Exit(Self.Withdraw(B, Amount, TStringArray([]), WithdrawMode, Quantity));
-        end;
-
-      Wait(0, 500, wdLeft);
+      if Self.Withdraw(Items[Slots[0]], Amount, TStringArray([]), WithdrawMode, Quantity) then
+        Exit(True);
     end;
   end;
 end;
