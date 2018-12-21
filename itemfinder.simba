@@ -85,11 +85,11 @@ begin
   end;
 end;
 
-function TRSItemFinder.Find(Identifer: String; Boxes: TBoxArray): TIntegerArray;
+function TRSItemFinder.Find(Identifer: String; Slots: TBoxArray): TIntegerArray;
 
   function GetItemImage(Identifer: String): TRSItemFinder_Image;
   var
-    i, ID: Int32;
+    i: Int32;
     Image: TRSItemFinder_Image;
     TPA: TPointArray;
   begin
@@ -124,25 +124,35 @@ function TRSItemFinder.Find(Identifer: String; Boxes: TBoxArray): TIntegerArray;
     Result := Result + TPA;
   end;
 
-  function GetItemEdge(Image: TRSItemFinder_Image): TPointArray;
+  // Get a point to align both images with anything at the bottom is fine.
+  function GetItemCorner(Image: TRSItemFinder_Image): TPoint;
+  var
+    TPA: TPointArray;
   begin
-    if Image.FindColors(Result, $10000) then
-      Result := ClearTPAFromTPA(Result, GetItemStack(Image));
+    if Image.FindColors(TPA, $10000) then
+    begin
+      TPA.SortByY();
+
+      Result := TPA[High(TPA)];
+    end;
   end;
 
   procedure AlignTemplateToImage(Image: TRSItemFinder_Image; var Templ: TRSItemFinder_Image);
   var
-    TPA: TPointArray;
     Replacement: TRSItemFinder_Image;
+    ImageCorner, TemplateCorner: TPoint;
   begin
     Replacement.Init();
     Replacement.SetSize(Image.GetWidth(), Image.GetHeight());
 
-    with GetItemEdge(Image).Bounds() do
+    ImageCorner := GetItemCorner(Image);
+    TemplateCorner := GetItemCorner(Templ);
+
+    if (ImageCorner <> [0, 0]) and (TemplateCorner <> [0, 0]) then
       Templ.DrawTransparent(
-        Max(0, X2 - Templ.GetWidth() + 1),
-        Max(0, Y2 - Templ.GetHeight() + 1), Replacement
-      );
+          Max(0, ImageCorner.X - TemplateCorner.X),
+          Max(0, ImageCorner.Y - TemplateCorner.Y), Replacement
+        );
 
     Templ.Free();
     Templ := Replacement;
@@ -179,9 +189,9 @@ var
   Image, Templ: TRSItemFinder_Image;
   Index: Int32;
 begin
-  for Index := 0 to High(Boxes) do
+  for Index := 0 to High(Slots) do
   begin
-    Image := GetMufasaBitmap(BitmapFromClient(Boxes[Index]));
+    Image := GetMufasaBitmap(BitmapFromClient(Slots[Index]));
     Templ := GetItemImage(Identifer);
 
     AlignTemplateToImage(Image, Templ);
