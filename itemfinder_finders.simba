@@ -143,7 +143,7 @@ begin
   if Self.Withdraw(Identifer, Amount, TStringArray([]), WithdrawMode, Quantity) then
     Exit(True);
 
-  if Self.Search(Identifer) then
+  if Self.Search(LowerCase(Identifer)) then
   begin
     Items := GetItems();
     Slots := ItemFinder.Find(Identifer, Items);
