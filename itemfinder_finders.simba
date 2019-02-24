@@ -143,16 +143,21 @@ begin
   if Self.Withdraw(Identifer, Amount, TStringArray([]), WithdrawMode, Quantity) then
     Exit(True);
 
-  if Self.Search(LowerCase(Identifer)) then
-  begin
-    Items := GetItems();
-    Slots := ItemFinder.Find(Identifer, Items);
-
-    if Length(Slots) > 0 then
+  try
+    if Self.Search(LowerCase(Identifer)) then
     begin
-      if Self.Withdraw(Items[Slots[0]], Amount, TStringArray([]), WithdrawMode, Quantity) then
-        Exit(True);
+      Items := GetItems();
+      Slots := ItemFinder.Find(Identifer, Items);
+
+      if Length(Slots) > 0 then
+      begin
+        if Self.Withdraw(Items[Slots[0]], Amount, TStringArray([]), WithdrawMode, Quantity) then
+          Exit(True);
+      end;
     end;
+  finally
+    if Self.IsToggled(BANK_BUTTON_SEARCH) then
+      Self.ClickButton(BANK_BUTTON_SEARCH);
   end;
 end;
 
