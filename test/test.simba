@@ -1,0 +1,63 @@
+{$I SRL/osr.simba}
+{$I RSItemFinder/itemfinder-2.simba}
+
+const
+  Tests = [
+            ["mark of grace",             "[0]"],
+            ["fire rune",                 "[1]"],
+            ["camelot teleport",          "[2]"],
+            ["varrock teleport",          "[3]"],
+
+            ["amulet of glory(6)",        "[4]"],
+            ["noted monk's robe",         "[5]"],
+            ["mind rune",                 "[6]"],
+            ["cadavaberry seed",          "[7]"],
+
+            ["noted staff of air",        "[8]"],
+            ["amulet of glory",           "[9]"],
+            ["wizard hat",                "[10]"],
+            ["stamina potion(1)",         "[11]"],
+
+            ["prayer potion(1)",          "[12, 27]"],
+            ["ring of wealth (4)",        "[13]"],
+            ["combat bracelet(6)",        "[14]"],
+            ["skills necklace(2)",        "[15]"],
+
+            ["staff of water",            "[16]"],
+            ["noted hardleather body",    "[17]"],
+            ["ring of wealth",            "[18]"],
+            ["dwellberry seed",           "[19]"],
+
+            ["vial",                      "[20]"],
+            ["water rune",                "[21]"],
+            ["iron scimitar",             "[22]"],
+            ["noted staff of earth",      "[23]"],
+
+            ["blood rune",                "[24]"],
+            ["adamant scimitar",          "[25]"],
+            ["1130",                      "[26]"]
+          ];
+
+var
+  Slots: TBoxArray;
+  i: Int32;
+  Match: String;
+begin
+  SetTargetBitmap(LoadBitmap({$macro CURRENT_DIRECTORY} + '/test.png'));
+
+  Slots := Box(0, 0, 168, 252).Partition(7, 4, -2);
+  for i := 0 to High(Slots) do
+  begin
+    Slots[i].X1 += 3;
+    Slots[i].X2 -= 3;
+  end;
+
+  for i := 0 to High(Tests) do
+  begin
+    Match := ToString(ItemFinder.Find(Tests[i][0], Slots));
+    if Match <> Tests[i][1] then
+      raise 'Test "' + Tests[i][0] + '" failed: ' + Match;
+
+    WriteLn('Test "' + Tests[i][0] + '" passed');
+  end;
+end;

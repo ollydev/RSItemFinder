@@ -1,0 +1,3 @@
+[submodule "osrsbox-db"]
+	path = osrsbox-db
+	url = https://github.com/osrsbox/osrsbox-db
