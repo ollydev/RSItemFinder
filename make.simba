@@ -1,0 +1,56 @@
+// It's slow & not optimised but it's 100% native Simba.
+// Converts to itemfinder images & names list.
+// Removes duplicate items.
+
+var
+  Data, Item: TJSONObject;
+  Input, Output, Keys: TStringList;
+  Image: TMemoryStream;
+  i: Int32;
+  ID: String;
+  Name: String;
+  t: UInt64;
+begin
+  CreateDirectory({$macro CURRENT_DIRECTORY} + '/make');
+  CreateDirectory({$macro CURRENT_DIRECTORY} + '/make/item-images/');
+
+  Input.Init();
+  Input.LoadFromFile({$macro CURRENT_DIRECTORY} + '/osrsbox-db/docs/items-complete.json');
+
+  Output.Init();
+  Image.Init();
+  Data.Init(Input.GetText());
+
+  Keys := Data.Keys();
+
+  try
+    for i := 0 to Keys.GetCount() - 1 do
+    begin
+      if (i mod 1000 = 0) then
+        WriteLn(Round((i / Keys.GetCount()) * 100), '%');
+
+      ID := Keys.GetStrings(i);
+      Item := Data.GetJSONObject(ID);
+
+      if Item.GetBoolean('noted') then
+        Name := 'noted ' + Item.GetString('name')
+      else
+        Name := Item.GetString('name');
+
+      if Output.IndexOfName(Name) = -1 then
+      begin
+        Output.Add(LowerCase(Name) + '=' + ID);
+
+        Image.LoadFromFile({$macro CURRENT_DIRECTORY} + '/osrsbox-db/docs/items-icons/' + ID + '.png');
+        Image.SaveToFile({$macro CURRENT_DIRECTORY} + '/make/item-images/' + ID + '.png');
+      end;
+
+      Item.Free();
+    end;
+  finally
+    Output.SaveToFile({$macro CURRENT_DIRECTORY} + '/make/item-names');
+    Output.Free();
+    Input.Free();
+    Image.Free();
+  end;
+end.
